@@ -105,10 +105,29 @@
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
     gap: 2px 14px;
   }
-  .results .word { padding: 4px 8px; font-size: 14px; border-radius: 6px; }
+  .results .word { padding: 4px 8px; font-size: 14px; border-radius: 6px; cursor: pointer; user-select: none; }
   .results .word:hover { background: var(--panel); }
   .results .word b { color: var(--accent); }
+  .results .word.fav { background: rgba(108,140,255,.16); }
+  .results .word.fav::after { content: " ★"; color: var(--accent); font-size: 11px; }
   .empty { color: var(--muted); padding: 20px; text-align: center; }
+
+  /* Favorites */
+  .summary .tools { display: flex; gap: 8px; flex-wrap: wrap; }
+  button.small { padding: 7px 12px; min-height: 36px; font-size: 13px; }
+  .favlist { display: flex; flex-wrap: wrap; gap: 8px; }
+  .fav-empty { color: var(--muted); }
+  .fav-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 999px; padding: 6px 6px 6px 12px; font-size: 14px;
+  }
+  .fav-chip .rm {
+    cursor: pointer; color: var(--muted); font-weight: 700; line-height: 1;
+    width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+  }
+  .fav-chip .rm:hover { color: var(--bad); background: var(--panel); }
   .bar {
     height: 6px; background: var(--panel-2); border-radius: 4px; overflow: hidden; margin-top: 10px; display: none;
   }
@@ -185,6 +204,18 @@
       <div class="count" id="shownNote" style="color:var(--muted);font-size:13px"></div>
     </div>
     <div class="results" id="results"></div>
+  </div>
+
+  <div class="card" id="favCard">
+    <div class="summary">
+      <div class="count">★ Favorites: <b id="favCount">0</b></div>
+      <div class="tools">
+        <button id="favCopyBtn" class="ghost small" disabled>Copy</button>
+        <button id="favDownloadBtn" class="ghost small" disabled>Download</button>
+        <button id="favClearBtn" class="ghost small" disabled>Clear</button>
+      </div>
+    </div>
+    <div class="favlist" id="favlist"></div>
   </div>
 </main>
 
@@ -345,13 +376,62 @@ function render(matches, prefixes, caseSensitive, limit) {
       const cmp = caseSensitive ? w : w.toLowerCase();
       let plen = 0;
       for (const n of lens) { if (cmp.startsWith(n)) { plen = n.length; break; } }
-      return `<div class="word"><b>${escapeHtml(w.slice(0, plen))}</b>${escapeHtml(w.slice(plen))}</div>`;
+      const title = FAVORITES.has(w) ? "Click to remove from favorites" : "Click to add to favorites";
+      return `<div class="word" data-word="${escapeHtml(w)}" title="${title}"><b>${escapeHtml(w.slice(0, plen))}</b>${escapeHtml(w.slice(plen))}</div>`;
     }).join("");
   }
+  markResultFavs();
 
   const has = matches.length > 0;
   $("copyBtn").disabled = !has;
   $("downloadBtn").disabled = !has;
+}
+
+/* ---- Favorites (persisted in localStorage) ---- */
+const FAV_KEY = "dictx-favorites";
+let FAVORITES = loadFavorites();
+
+function loadFavorites() {
+  try { return new Set(JSON.parse(localStorage.getItem(FAV_KEY)) || []); }
+  catch { return new Set(); }
+}
+function saveFavorites() {
+  try { localStorage.setItem(FAV_KEY, JSON.stringify([...FAVORITES])); }
+  catch { /* storage may be unavailable (private mode / quota) */ }
+}
+
+function toggleFavorite(word) {
+  if (FAVORITES.has(word)) FAVORITES.delete(word);
+  else FAVORITES.add(word);
+  saveFavorites();
+  renderFavorites();
+  markResultFavs();
+}
+
+// Reflect favorite state on any currently displayed result tiles.
+function markResultFavs() {
+  document.querySelectorAll("#results .word").forEach((el) => {
+    const fav = FAVORITES.has(el.dataset.word);
+    el.classList.toggle("fav", fav);
+    el.title = fav ? "Click to remove from favorites" : "Click to add to favorites";
+  });
+}
+
+function renderFavorites() {
+  const arr = [...FAVORITES];
+  $("favCount").textContent = arr.length.toLocaleString();
+  const list = $("favlist");
+  if (arr.length === 0) {
+    list.innerHTML = '<div class="fav-empty">No favorites yet — click any word in the results to save it.</div>';
+  } else {
+    list.innerHTML = arr.map((w) =>
+      `<span class="fav-chip">${escapeHtml(w)}<span class="rm" data-word="${escapeHtml(w)}" title="Remove" role="button">×</span></span>`
+    ).join("");
+  }
+  const has = arr.length > 0;
+  $("favCopyBtn").disabled = !has;
+  $("favDownloadBtn").disabled = !has;
+  $("favClearBtn").disabled = !has;
 }
 
 $("searchBtn").addEventListener("click", search);
@@ -378,6 +458,48 @@ $("downloadBtn").addEventListener("click", () => {
   a.click();
   URL.revokeObjectURL(url);
 });
+
+// Click a result word to toggle it as a favorite (event delegation).
+$("results").addEventListener("click", (e) => {
+  const tile = e.target.closest(".word");
+  if (tile && tile.dataset.word) toggleFavorite(tile.dataset.word);
+});
+
+// Click the × on a favorite chip to remove it.
+$("favlist").addEventListener("click", (e) => {
+  const rm = e.target.closest(".rm");
+  if (rm && rm.dataset.word) toggleFavorite(rm.dataset.word);
+});
+
+$("favCopyBtn").addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText([...FAVORITES].join("\n"));
+    setStatus(`Copied ${FAVORITES.size.toLocaleString()} favorite(s) to clipboard.`, "ok");
+  } catch {
+    setStatus("Clipboard not available in this context.", "error");
+  }
+});
+
+$("favDownloadBtn").addEventListener("click", () => {
+  const blob = new Blob([[...FAVORITES].join("\n") + "\n"], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "dictx-favorites.txt";
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+$("favClearBtn").addEventListener("click", () => {
+  if (FAVORITES.size === 0) return;
+  if (!confirm(`Remove all ${FAVORITES.size} favorite(s)?`)) return;
+  FAVORITES.clear();
+  saveFavorites();
+  renderFavorites();
+  markResultFavs();
+});
+
+renderFavorites();
 </script>
 </body>
 </html>

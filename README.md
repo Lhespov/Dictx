@@ -32,6 +32,9 @@ the matches appear instantly. You can:
 
 - **Sort** results **alphabetically (A–Z)** or by **most common first** (usage
   frequency, from the top-30k word-frequency list).
+- **Favorite words** — click any result word to save it to a favorites list
+  that persists in your browser (`localStorage`). Copy, download, or clear the
+  list, and remove individual words with the × on each chip.
 - Set a result limit, toggle case-sensitivity, and copy or download the matches.
 
 The dictionary is fetched once and cached for the session. It's a single static
