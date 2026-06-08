@@ -15,7 +15,12 @@ No third-party dependencies. Use it two ways:
 
 ## Web UI
 
-Just open `index.html` — or run a tiny local server and visit it:
+**Live site:** https://lhespov.github.io/Dictx/ (published from this repo via
+GitHub Actions — see `.github/workflows/pages.yml`). The page is
+mobile-optimized: large touch targets, no zoom-on-focus, and a responsive
+layout.
+
+Or run it locally — just open `index.html`, or serve the folder:
 
 ```bash
 python3 -m http.server 8000

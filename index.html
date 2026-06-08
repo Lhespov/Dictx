@@ -2,7 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0f1117" />
+<meta name="color-scheme" content="dark" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Dictx" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="format-detection" content="telephone=no" />
+<meta name="description" content="Download a dictionary and extract words starting with a letter or prefix." />
 <title>Dictx — extract words by prefix</title>
 <style>
   :root {
@@ -17,13 +25,15 @@
     --good: #4ade80;
     --bad: #f87171;
   }
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { -webkit-text-size-adjust: 100%; }
   body {
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     background: var(--bg);
     color: var(--text);
     line-height: 1.5;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   }
   header {
     padding: 28px 20px 16px;
@@ -46,13 +56,15 @@
   .row > .field { flex: 1; min-width: 140px; }
   input[type="text"], input[type="number"] {
     width: 100%;
-    padding: 12px 14px;
+    padding: 13px 14px;
     background: var(--panel-2);
     border: 1px solid var(--border);
     border-radius: 10px;
     color: var(--text);
-    font-size: 15px;
+    font-size: 16px; /* >=16px keeps iOS Safari from zooming on focus */
     outline: none;
+    -webkit-appearance: none;
+    appearance: none;
   }
   input[type="text"]:focus, input[type="number"]:focus { border-color: var(--accent); }
   .prefix-input { font-size: 18px; letter-spacing: 1px; }
@@ -60,13 +72,15 @@
   .checks label { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--text); font-size: 14px; cursor: pointer; }
   .actions { display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
   button {
-    padding: 12px 20px;
+    padding: 13px 20px;
+    min-height: 48px; /* comfortable touch target */
     border: none;
     border-radius: 10px;
     font-size: 15px;
     font-weight: 600;
     cursor: pointer;
     transition: background .15s, opacity .15s;
+    touch-action: manipulation;
   }
   button.primary { background: var(--accent-2); color: #fff; }
   button.primary:hover { background: var(--accent); }
@@ -100,6 +114,25 @@
   .bar > div { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
   footer { text-align: center; color: var(--muted); font-size: 12px; padding: 10px 20px 30px; }
   code { background: var(--panel-2); padding: 1px 6px; border-radius: 5px; font-size: 13px; }
+
+  @media (max-width: 600px) {
+    header { padding: 22px 16px 14px; }
+    header h1 { font-size: 24px; }
+    main { padding: 14px; }
+    .card { padding: 16px; border-radius: 12px; margin-bottom: 14px; }
+    .actions { gap: 10px; }
+    /* Primary button full width, secondary actions share a row */
+    .actions button.primary { flex: 1 1 100%; }
+    .actions button.ghost { flex: 1 1 0; }
+    .results {
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      max-height: 60vh;
+    }
+    .results .word { padding: 8px; } /* taller rows = easier to tap */
+  }
+  @media (hover: none) {
+    .results .word:active { background: var(--panel); }
+  }
 </style>
 </head>
 <body>
@@ -112,13 +145,15 @@
   <div class="card">
     <div class="field">
       <label for="prefix">Prefix(es) — separate multiple with spaces or commas</label>
-      <input id="prefix" class="prefix-input" type="text" placeholder="e.g.  qu   or   pre, anti" autocomplete="off" />
+      <input id="prefix" class="prefix-input" type="text" placeholder="e.g.  qu   or   pre, anti"
+             autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+             enterkeyhint="search" />
     </div>
 
     <div class="row" style="margin-top:14px">
       <div class="field">
         <label for="limit">Max results (0 = no limit)</label>
-        <input id="limit" type="number" min="0" value="500" />
+        <input id="limit" type="number" min="0" value="500" inputmode="numeric" />
       </div>
     </div>
 
