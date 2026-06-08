@@ -54,7 +54,7 @@
   label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
   .row { display: flex; gap: 14px; flex-wrap: wrap; }
   .row > .field { flex: 1; min-width: 140px; }
-  input[type="text"], input[type="number"] {
+  input[type="text"], input[type="number"], select {
     width: 100%;
     padding: 13px 14px;
     background: var(--panel-2);
@@ -66,7 +66,15 @@
     -webkit-appearance: none;
     appearance: none;
   }
-  input[type="text"]:focus, input[type="number"]:focus { border-color: var(--accent); }
+  select {
+    /* custom dropdown chevron */
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path fill='%238b93a7' d='M2 4l4 4 4-4z'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 38px;
+    cursor: pointer;
+  }
+  input[type="text"]:focus, input[type="number"]:focus, select:focus { border-color: var(--accent); }
   .prefix-input { font-size: 18px; letter-spacing: 1px; }
   .checks { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; margin-top: 14px; }
   .checks label { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--text); font-size: 14px; cursor: pointer; }
@@ -152,6 +160,13 @@
 
     <div class="row" style="margin-top:14px">
       <div class="field">
+        <label for="sort">Sort results by</label>
+        <select id="sort">
+          <option value="alpha">Alphabetical (A–Z)</option>
+          <option value="freq">Most common first</option>
+        </select>
+      </div>
+      <div class="field">
         <label for="limit">Max results (0 = no limit)</label>
         <input id="limit" type="number" min="0" value="500" inputmode="numeric" />
       </div>
@@ -181,11 +196,14 @@
 </main>
 
 <footer>
-  Word list: public-domain <a href="https://github.com/dwyl/english-words" style="color:var(--accent)">dwyl/english-words</a> (~370k words), loaded once and cached in your browser.
+  Word list: <a href="https://github.com/dwyl/english-words" style="color:var(--accent)">dwyl/english-words</a> (~370k words).
+  Frequency order from <a href="https://github.com/arstgit/high-frequency-vocabulary" style="color:var(--accent)">high-frequency-vocabulary</a> (top 30k). Loaded once and cached in your browser.
 </footer>
 
 <script>
 const DICT_URL = "https://raw.githubusercontent.com/dwyl/english-words/master/words_alpha.txt";
+// 30k most common English words, ordered by usage frequency (line 0 = most common).
+const FREQ_URL = "https://raw.githubusercontent.com/arstgit/high-frequency-vocabulary/master/30k.txt";
 
 const $ = (id) => document.getElementById(id);
 const statusEl = $("status");
@@ -193,6 +211,7 @@ const bar = $("bar");
 const barFill = bar.firstElementChild;
 
 let WORDS = null;          // array of all words, cached for the session
+let FREQ_RANK = null;      // Map<lowercase word, rank>; lower rank = more common
 let lastMatches = [];      // most recent result set (for copy/download)
 
 function setStatus(msg, kind = "") {
@@ -232,6 +251,43 @@ async function loadWords() {
   return WORDS;
 }
 
+// Load the frequency list once and build a word -> rank map (lazy: only needed
+// for "Most common first" sorting). It's small (~265 KB) so no progress bar.
+async function loadFreq() {
+  if (FREQ_RANK) return FREQ_RANK;
+  setStatus("Loading word-frequency data…");
+  const resp = await fetch(FREQ_URL);
+  if (!resp.ok) throw new Error("frequency list HTTP " + resp.status);
+  const lines = (await resp.text()).split(/\r?\n/);
+  FREQ_RANK = new Map();
+  let rank = 0;
+  for (const line of lines) {
+    const w = line.trim().toLowerCase();
+    if (w && !FREQ_RANK.has(w)) FREQ_RANK.set(w, rank++);
+  }
+  return FREQ_RANK;
+}
+
+// Sort matches in place by the chosen order.
+//  - "alpha": case-insensitive A–Z.
+//  - "freq":  most common first; words absent from the frequency list are
+//             treated as rarest and ordered alphabetically after the ranked ones.
+function sortMatches(matches, mode) {
+  if (mode === "freq") {
+    const rankOf = (w) => {
+      const r = FREQ_RANK.get(w.toLowerCase());
+      return r === undefined ? Infinity : r;
+    };
+    matches.sort((a, b) => {
+      const ra = rankOf(a), rb = rankOf(b);
+      if (ra !== rb) return ra - rb;
+      return a.localeCompare(b); // tie-break (incl. all unranked) alphabetically
+    });
+  } else {
+    matches.sort((a, b) => a.localeCompare(b));
+  }
+}
+
 function parsePrefixes(raw) {
   return raw.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
 }
@@ -249,10 +305,12 @@ async function search() {
   }
   const caseSensitive = $("caseSensitive").checked;
   const limit = Math.max(0, parseInt($("limit").value, 10) || 0);
+  const sortMode = $("sort").value;
 
   $("searchBtn").disabled = true;
   try {
     const words = await loadWords();
+    if (sortMode === "freq") await loadFreq();
 
     const needles = caseSensitive ? prefixes : prefixes.map((p) => p.toLowerCase());
     const matches = [];
@@ -264,9 +322,11 @@ async function search() {
       }
     }
 
+    sortMatches(matches, sortMode);
     lastMatches = matches;
     render(matches, prefixes, caseSensitive, limit);
-    setStatus(`Found ${matches.length.toLocaleString()} match(es) for ${prefixes.map((p) => '"' + p + '"').join(", ")}.`, "ok");
+    const order = sortMode === "freq" ? "most common first" : "A–Z";
+    setStatus(`Found ${matches.length.toLocaleString()} match(es) for ${prefixes.map((p) => '"' + p + '"').join(", ")} (${order}).`, "ok");
   } catch (err) {
     bar.style.display = "none";
     setStatus("Failed to load dictionary: " + err.message, "error");
@@ -303,6 +363,8 @@ function render(matches, prefixes, caseSensitive, limit) {
 
 $("searchBtn").addEventListener("click", search);
 $("prefix").addEventListener("keydown", (e) => { if (e.key === "Enter") search(); });
+// Re-sort instantly when the order changes (only if a search has run).
+$("sort").addEventListener("change", () => { if ($("prefix").value.trim()) search(); });
 
 $("copyBtn").addEventListener("click", async () => {
   try {

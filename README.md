@@ -28,10 +28,14 @@ python3 -m http.server 8000
 ```
 
 Type a prefix (or several, space/comma separated), hit **Extract words**, and
-the matches appear instantly. The dictionary is fetched once and cached for the
-session; you can set a result limit, toggle case-sensitivity, and copy or
-download the matches. It's a single static file — host it anywhere (e.g. GitHub
-Pages) with no backend.
+the matches appear instantly. You can:
+
+- **Sort** results **alphabetically (A–Z)** or by **most common first** (usage
+  frequency, from the top-30k word-frequency list).
+- Set a result limit, toggle case-sensitivity, and copy or download the matches.
+
+The dictionary is fetched once and cached for the session. It's a single static
+file — host it anywhere (e.g. GitHub Pages) with no backend.
 
 ## CLI usage
 
