@@ -7,9 +7,28 @@ The prefix can be one letter, two letters, or any length — `a`, `qu`, `pre`,
 `anti`, and so on. The word list is downloaded once and cached locally, so
 later runs are instant.
 
-No third-party dependencies — just Python 3 (standard library only).
+No third-party dependencies. Use it two ways:
 
-## Usage
+- **Web UI** — open `index.html` in a browser (or serve the folder) for a
+  point-and-click interface.
+- **CLI** — `dictx.py`, Python 3 standard library only.
+
+## Web UI
+
+Just open `index.html` — or run a tiny local server and visit it:
+
+```bash
+python3 -m http.server 8000
+# then open http://localhost:8000
+```
+
+Type a prefix (or several, space/comma separated), hit **Extract words**, and
+the matches appear instantly. The dictionary is fetched once and cached for the
+session; you can set a result limit, toggle case-sensitivity, and copy or
+download the matches. It's a single static file — host it anywhere (e.g. GitHub
+Pages) with no backend.
+
+## CLI usage
 
 ```bash
 # all words starting with "a"
